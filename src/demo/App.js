@@ -130,15 +130,17 @@ const tourConfig = [
     selector: '[data-tut="reactour__iso"]',
     content:
       "Ok, let's start with the name of the Tour that is about to begin.",
-    actionBefore: async () => {
-      await timeout(5000)
-      console.log('Hola!')
-    },
+    // actionBefore: async () => {
+    //   await timeout(5000)
+    //   console.log('Hola!')
+    // },
+    actionType: 'click',
   },
   {
     selector: '[data-tut="reactour__logo"]',
     content: 'And this is our cool bus...',
     position: [20, 20],
+    actionType: 'dblclick',
   },
   {
     selector: '[data-tut="reactour__copy"]',

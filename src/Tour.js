@@ -21,6 +21,10 @@ import { getNodeRect, getWindow, inView, isBody } from './helpers'
 import { propTypes, defaultProps } from './propTypes'
 import CN from './classNames'
 
+export const stepWait = ms => {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 function Tour({
   children,
   isOpen,
@@ -52,7 +56,9 @@ function Tour({
   maskSpace,
   showCloseButton,
   accessibilityOptions,
+  stepWaitTimer,
 }) {
+  const [totalSteps] = useState(steps.length)
   const [current, setCurrent] = useState(0)
   const [started, setStarted] = useState(false)
   const [state, dispatch] = useReducer(reducer, initialState)
@@ -206,10 +212,12 @@ function Tour({
           offset,
           callback: _node => {
             makeCalculations(getNodeRect(_node), step.position)
+            attchListeners(node, step)
           },
         })
       } else {
         makeCalculations(nodeRect, step.position)
+        attchListeners(node, step)
       }
     } else {
       dispatch({
@@ -223,6 +231,92 @@ function Tour({
 
     if (step.action && typeof step.action === 'function') {
       await step.action(node)
+    }
+  }
+
+  async function stepUp() {
+    if (current + 1 < totalSteps) {
+      await stepWait(stepWaitTimer)
+      setCurrent(current + 1)
+    } else {
+      close()
+    }
+  }
+
+  // const goTo = useCallback(
+  //   async i => {
+  //     await stepWait(stepWaitTimer)
+  //     setCurrentStep(i)
+  //   },
+  //   [setCurrentStep]
+  // )
+
+  function handleResize(e) {
+    if (!playTour) {
+      return
+    }
+    const step = steps[currentStep]
+    const node = step.selector ? document.querySelector(step.selector) : null
+    node && makeCalculations(getNodeRect(node), step.position)
+  }
+
+  function stepDown() {
+    setCurrentStep(currentStep === 0 ? currentStep : currentStep - 1)
+  }
+
+  function stepStart(step) {
+    step.beforeStep && step.beforeStep(step)
+  }
+
+  function stepEnd() {
+    const step = steps[current]
+    step.afterStep && step.afterStep(step)
+    stepUp()
+  }
+
+  // function close() {
+  //   if (onBeforeClose && typeof onBeforeClose === 'function') {
+  //     onBeforeClose(balloonRef.current)
+  //   }
+  //   onRequestClose()
+  // }
+
+  async function attchListeners(node, step) {
+    switch (step.actionType) {
+      case actionType.CLICK:
+        node.addEventListener('click', clickActionPerformed)
+        break
+      case actionType.DBL_CLICK:
+        node.addEventListener('dblclick', dblClickActionPerformed)
+        break
+      case actionType.TYPING:
+        node.addEventListener('input', typeActionPerformed)
+        break
+      case actionType.CUSTOM:
+      default:
+        break
+    }
+    step.isRendered = true
+  }
+
+  function clickActionPerformed(e) {
+    console.log('click')
+    e.target.removeEventListener('click', clickActionPerformed)
+    stepEnd()
+  }
+
+  function dblClickActionPerformed(e) {
+    e.target.removeEventListener('click', dblClickActionPerformed)
+    stepEnd()
+  }
+
+  function typeActionPerformed(e) {
+    const stepData = steps[currentStep]
+    if (stepData.userTypeText === e.target.value) {
+      e.target.removeEventListener('input', typeActionPerformed)
+      setTimeout(() => {
+        stepEnd()
+      }, 0)
     }
   }
 
@@ -444,6 +538,16 @@ function reducer(state, action) {
     default:
       return state
   }
+}
+
+const actionType = {
+  CLICK: 'click',
+  DBL_CLICK: 'dblclick',
+  TYPING: 'typing',
+  DRAG_N_DROP: 'dragdrop',
+  DRAG_WITH_MOUSE_MOVE: 'dragwithmove',
+  CUSTOM: 'custom',
+  WAIT: 'wait',
 }
 
 Tour.propTypes = propTypes
